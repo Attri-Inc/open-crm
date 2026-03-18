@@ -100,3 +100,72 @@ export interface ActorContext {
   prompt_hash?: string;
 }
 
+// ── Memory Layer ───────────────────────────────────────────────────
+
+export type ArtifactType =
+  | "email"
+  | "call_transcript"
+  | "meeting_notes"
+  | "document"
+  | "note";
+
+export interface Artifact {
+  id: string;
+  artifact_type: ArtifactType;
+  title: string | null;
+  content: string;
+  content_hash: string;
+  participants: string[];
+  source_url: string | null;
+  recorded_at: string;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
+export type ObservationLifecycle = "current" | "superseded" | "retracted";
+
+export interface Observation {
+  id: string;
+  entity_id: string;
+  artifact_id: string | null;
+  observation_type: string;
+  field_path: string | null;
+  value: unknown;
+  snippet: string | null;
+  lifecycle: ObservationLifecycle;
+  superseded_by: string | null;
+  as_of: string;
+  valid_until: string | null;
+  confidence: number | null;
+  verification: VerificationStatus | null;
+  created_at: string;
+  actor: string | null;
+}
+
+export interface Brief {
+  id: string;
+  entity_id: string;
+  brief_type: string;
+  content: string;
+  observation_ids: string[];
+  policy_version: string | null;
+  generated_at: string;
+  generated_by: string | null;
+  created_at: string;
+}
+
+export type ConflictStatus = "open" | "resolved";
+
+export interface Conflict {
+  id: string;
+  observation_ids: string[];
+  entity_id: string;
+  field_path: string | null;
+  description: string;
+  status: ConflictStatus;
+  resolution: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  created_at: string;
+}
+
