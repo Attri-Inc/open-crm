@@ -10,6 +10,7 @@ import {
   createEntity,
   createRelationship,
   deleteRelationship,
+  listRelationships,
   getEntity,
   listEntityFieldProvenance,
   listEvents,
@@ -225,6 +226,21 @@ const tools = [
         id: { type: "string", description: "Relationship id to delete" },
       },
       required: ["id"],
+    },
+  },
+  {
+    name: "list_relationships",
+    description:
+      "List relationships for a given entity. Returns all relationships where the entity is either the source or target. " +
+      "Simpler than traverse_graph — use this when you just need to see an entity's direct connections.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        entity_id: { type: "string", description: "Entity id to list relationships for" },
+        type: { type: "string", description: "Filter by relationship type" },
+        limit: { type: "number", description: "Max results (default: 50)" },
+        offset: { type: "number", description: "Pagination offset" },
+      },
     },
   },
   {
@@ -592,6 +608,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const ok = deleteRelationship(id);
         if (!ok) return jsonResult({ error: "Not found" }, true);
         return jsonResult({ deleted: true });
+      }
+      case "list_relationships": {
+        const relationships = listRelationships({
+          entity_id: (args as any)?.entity_id,
+          type: (args as any)?.type,
+          limit: (args as any)?.limit,
+          offset: (args as any)?.offset,
+        });
+        return jsonResult({ relationships });
       }
       case "traverse_graph": {
         const query = validateArgs(GraphQuerySchema, args);

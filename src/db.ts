@@ -588,6 +588,33 @@ export function createRelationship(input: {
   return relationship;
 }
 
+export function listRelationships(params: {
+  entity_id?: string;
+  type?: string;
+  limit?: number;
+  offset?: number;
+}): Relationship[] {
+  const where: string[] = [];
+  const values: unknown[] = [];
+
+  if (params.entity_id) {
+    where.push("(from_id = ? OR to_id = ?)");
+    values.push(params.entity_id, params.entity_id);
+  }
+  if (params.type) {
+    where.push("type = ?");
+    values.push(params.type);
+  }
+
+  const limit = Math.min(params.limit ?? 50, 200);
+  const offset = params.offset ?? 0;
+
+  const sql = `SELECT * FROM relationships ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+  values.push(limit, offset);
+
+  return getDb().prepare(sql).all(...values).map(toRelationship);
+}
+
 export function deleteRelationship(id: string, context?: ActorContext): boolean {
   const existing = getDb()
     .prepare("SELECT * FROM relationships WHERE id = ?")
@@ -686,6 +713,30 @@ export function searchEntities(params: SearchParams) {
   return rows.map(toEntity);
 }
 
+export function countEntities(params: SearchParams): number {
+  const values: unknown[] = [];
+  const where: string[] = [];
+  const joins: string[] = [];
+
+  if (params.type) {
+    where.push("e.type = ?");
+    values.push(params.type);
+  }
+  if (params.q) {
+    joins.push("JOIN entity_fts fts ON fts.entity_id = e.id");
+    where.push("entity_fts MATCH ?");
+    values.push(params.q);
+  }
+  if (params.filters && params.filters.length > 0) {
+    const clauses = buildFilterSql(params.filters, values);
+    where.push(...clauses);
+  }
+
+  const sql = `SELECT COUNT(*) as cnt FROM entities e ${joins.join(" ")} ${where.length ? `WHERE ${where.join(" AND ")}` : ""}`;
+  const row = getDb().prepare(sql).get(...values) as { cnt: number };
+  return row.cnt;
+}
+
 // ── Graph ──────────────────────────────────────────────────────────
 
 export function traverseGraph(query: GraphQuery) {
@@ -695,6 +746,7 @@ export function traverseGraph(query: GraphQuery) {
   const relType = query.type;
 
   const visited = new Set<string>();
+  const seenEdges = new Set<string>();
   const edges: Relationship[] = [];
   const nodes = new Map<string, Entity>();
 
@@ -733,6 +785,8 @@ export function traverseGraph(query: GraphQuery) {
       for (const row of relRows) {
         if (edges.length >= limit) break;
         const rel = toRelationship(row);
+        if (seenEdges.has(rel.id)) continue;
+        seenEdges.add(rel.id);
         edges.push(rel);
 
         const otherId = rel.from_id === entityId ? rel.to_id : rel.from_id;
@@ -868,6 +922,18 @@ export function listArtifacts(params: {
   return getDb().prepare(sql).all(...values).map(toArtifact);
 }
 
+export function countArtifacts(params: { artifact_type?: string }): number {
+  const where: string[] = [];
+  const values: unknown[] = [];
+  if (params.artifact_type) {
+    where.push("artifact_type = ?");
+    values.push(params.artifact_type);
+  }
+  const sql = `SELECT COUNT(*) as cnt FROM artifacts ${where.length ? `WHERE ${where.join(" AND ")}` : ""}`;
+  const row = getDb().prepare(sql).get(...values) as { cnt: number };
+  return row.cnt;
+}
+
 // ── Observations ───────────────────────────────────────────────────
 
 export function createObservation(input: {
@@ -963,6 +1029,17 @@ export function listObservations(params: {
   return getDb().prepare(sql).all(...values).map(toObservation);
 }
 
+export function countObservations(params: { entity_id?: string; artifact_id?: string; lifecycle?: string }): number {
+  const where: string[] = [];
+  const values: unknown[] = [];
+  if (params.entity_id) { where.push("entity_id = ?"); values.push(params.entity_id); }
+  if (params.artifact_id) { where.push("artifact_id = ?"); values.push(params.artifact_id); }
+  if (params.lifecycle) { where.push("lifecycle = ?"); values.push(params.lifecycle); }
+  const sql = `SELECT COUNT(*) as cnt FROM observations ${where.length ? `WHERE ${where.join(" AND ")}` : ""}`;
+  const row = getDb().prepare(sql).get(...values) as { cnt: number };
+  return row.cnt;
+}
+
 export function updateObservationLifecycle(
   id: string,
   lifecycle: ObservationLifecycle,
@@ -1052,6 +1129,16 @@ export function listBriefs(params: {
   return getDb().prepare(sql).all(...values).map(toBrief);
 }
 
+export function countBriefs(params: { entity_id?: string; brief_type?: string }): number {
+  const where: string[] = [];
+  const values: unknown[] = [];
+  if (params.entity_id) { where.push("entity_id = ?"); values.push(params.entity_id); }
+  if (params.brief_type) { where.push("brief_type = ?"); values.push(params.brief_type); }
+  const sql = `SELECT COUNT(*) as cnt FROM briefs ${where.length ? `WHERE ${where.join(" AND ")}` : ""}`;
+  const row = getDb().prepare(sql).get(...values) as { cnt: number };
+  return row.cnt;
+}
+
 // ── Conflicts ──────────────────────────────────────────────────────
 
 export function createConflict(input: {
@@ -1123,6 +1210,16 @@ export function listConflicts(params: {
   values.push(limit, offset);
 
   return getDb().prepare(sql).all(...values).map(toConflict);
+}
+
+export function countConflicts(params: { entity_id?: string; status?: string }): number {
+  const where: string[] = [];
+  const values: unknown[] = [];
+  if (params.entity_id) { where.push("entity_id = ?"); values.push(params.entity_id); }
+  if (params.status) { where.push("status = ?"); values.push(params.status); }
+  const sql = `SELECT COUNT(*) as cnt FROM conflicts ${where.length ? `WHERE ${where.join(" AND ")}` : ""}`;
+  const row = getDb().prepare(sql).get(...values) as { cnt: number };
+  return row.cnt;
 }
 
 export function resolveConflict(

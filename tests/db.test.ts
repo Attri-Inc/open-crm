@@ -8,7 +8,9 @@ import {
   archiveEntity,
   createRelationship,
   deleteRelationship,
+  listRelationships,
   searchEntities,
+  countEntities,
   traverseGraph,
   listEvents,
   listEntityFieldProvenance,
@@ -137,6 +139,21 @@ describe("relationships", () => {
     const deletedAgain = deleteRelationship(rel.id);
     expect(deletedAgain).toBe(false);
   });
+
+  it("lists relationships for an entity", () => {
+    const a = createEntity({ type: "contact" });
+    const b = createEntity({ type: "company" });
+    const c = createEntity({ type: "deal" });
+    createRelationship({ from_id: a.id, to_id: b.id, type: "EMPLOYED_AT" });
+    createRelationship({ from_id: b.id, to_id: c.id, type: "OWNS" });
+
+    const rels = listRelationships({ entity_id: a.id });
+    expect(rels).toHaveLength(1);
+    expect(rels[0].type).toBe("EMPLOYED_AT");
+
+    const bRels = listRelationships({ entity_id: b.id });
+    expect(bRels).toHaveLength(2);
+  });
 });
 
 // ── Search ─────────────────────────────────────────────────────────
@@ -171,6 +188,15 @@ describe("search", () => {
     expect(results[0].properties.full_name).toBe("Alice");
   });
 
+  it("counts entities matching search", () => {
+    createEntity({ type: "contact", properties: { full_name: "Alice" } });
+    createEntity({ type: "contact", properties: { full_name: "Bob" } });
+    createEntity({ type: "company", properties: { name: "Acme" } });
+
+    expect(countEntities({ type: "contact" })).toBe(2);
+    expect(countEntities({})).toBe(3);
+  });
+
   it("searches with property filters", () => {
     createEntity({ type: "contact", properties: { full_name: "Alice", title: "CTO" } });
     createEntity({ type: "contact", properties: { full_name: "Bob", title: "Engineer" } });
@@ -196,8 +222,8 @@ describe("graph traversal", () => {
 
     const graph = traverseGraph({ entity_id: contact.id, depth: 2 });
     expect(graph.nodes).toHaveLength(3);
-    // Bidirectional traversal revisits EMPLOYED_AT from company side
-    expect(graph.edges.length).toBeGreaterThanOrEqual(2);
+    // Edges are deduplicated — each relationship appears once
+    expect(graph.edges).toHaveLength(2);
   });
 
   it("respects direction filter", () => {

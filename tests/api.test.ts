@@ -130,7 +130,9 @@ describe("REST API", () => {
 
       const res = await request(app).get("/search?type=contact");
       expect(res.status).toBe(200);
-      expect(res.body.results).toHaveLength(1);
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.total).toBe(1);
+      expect(res.body.has_more).toBe(false);
     });
   });
 
@@ -210,7 +212,8 @@ describe("REST API", () => {
       expect(res.status).toBe(201);
 
       const list = await request(app).get(`/briefs?entity_id=${eid}`);
-      expect(list.body.briefs).toHaveLength(1);
+      expect(list.body.items).toHaveLength(1);
+      expect(list.body.total).toBe(1);
     });
   });
 

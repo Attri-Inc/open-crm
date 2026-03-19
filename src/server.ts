@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { ZodError, ZodSchema } from "zod";
 import { config } from "./config.js";
@@ -8,26 +8,33 @@ import {
   createRelationship,
   deleteRelationship,
   getEntity,
+  getDb,
   getIdempotentResponse,
   listEntityFieldProvenance,
   listEvents,
+  listRelationships,
   searchEntities,
+  countEntities,
   storeIdempotentResponse,
   traverseGraph,
   updateEntity,
   createArtifact,
   getArtifact,
   listArtifacts,
+  countArtifacts,
   createObservation,
   getObservation,
   listObservations,
+  countObservations,
   updateObservationLifecycle,
   createBrief,
   getBrief,
   listBriefs,
+  countBriefs,
   createConflict,
   getConflict,
   listConflicts,
+  countConflicts,
   resolveConflict,
   exportAll,
   importAll,
@@ -46,6 +53,8 @@ import {
   ResolveConflictSchema,
 } from "./schemas.js";
 
+// ── Helpers ────────────────────────────────────────────────────────
+
 function validate<T>(schema: ZodSchema<T>, data: unknown): { data: T } | { error: string } {
   try {
     return { data: schema.parse(data) };
@@ -58,9 +67,33 @@ function validate<T>(schema: ZodSchema<T>, data: unknown): { data: T } | { error
   }
 }
 
+function paginated<T>(items: T[], total: number, limit: number, offset: number) {
+  return { items, total, limit, offset, has_more: offset + items.length < total };
+}
+
+// ── App setup ──────────────────────────────────────────────────────
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
+
+// Request logging
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  const start = Date.now();
+  _res.on("finish", () => {
+    const ms = Date.now() - start;
+    console.log(
+      JSON.stringify({
+        method: req.method,
+        path: req.path,
+        status: _res.statusCode,
+        ms,
+        ts: new Date().toISOString(),
+      })
+    );
+  });
+  next();
+});
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -179,6 +212,15 @@ app.post("/relationships", (req, res) => {
   }
 });
 
+app.get("/relationships", (req, res) => {
+  const entity_id = req.query.entity_id ? String(req.query.entity_id) : undefined;
+  const type = req.query.type ? String(req.query.type) : undefined;
+  const limit = req.query.limit ? Number(req.query.limit) : 50;
+  const offset = req.query.offset ? Number(req.query.offset) : 0;
+  const relationships = listRelationships({ entity_id, type, limit, offset });
+  return res.json({ relationships });
+});
+
 app.delete("/relationships/:id", (req, res) => {
   const op = "DELETE /relationships/:id";
   const idempotencyKey = parseIdempotency(req);
@@ -222,8 +264,11 @@ app.get("/search", (req, res) => {
   if ("error" in parsed) return res.status(400).json({ error: parsed.error });
 
   try {
-    const result = searchEntities(parsed.data);
-    return res.json({ results: result });
+    const results = searchEntities(parsed.data);
+    const total = countEntities(parsed.data);
+    const limit = Math.min(parsed.data.limit ?? 50, 200);
+    const offset = parsed.data.offset ?? 0;
+    return res.json(paginated(results, total, limit, offset));
   } catch (err: any) {
     return res.status(400).json({ error: err?.message ?? "Invalid query" });
   }
@@ -284,7 +329,8 @@ app.get("/artifacts", (req, res) => {
   const limit = req.query.limit ? Number(req.query.limit) : 50;
   const offset = req.query.offset ? Number(req.query.offset) : 0;
   const artifacts = listArtifacts({ artifact_type, limit, offset });
-  return res.json({ artifacts });
+  const total = countArtifacts({ artifact_type });
+  return res.json(paginated(artifacts, total, limit, offset));
 });
 
 // ── Observations ───────────────────────────────────────────────────
@@ -314,7 +360,8 @@ app.get("/observations", (req, res) => {
   const limit = req.query.limit ? Number(req.query.limit) : 50;
   const offset = req.query.offset ? Number(req.query.offset) : 0;
   const observations = listObservations({ entity_id, artifact_id, lifecycle, limit, offset });
-  return res.json({ observations });
+  const total = countObservations({ entity_id, artifact_id, lifecycle });
+  return res.json(paginated(observations, total, limit, offset));
 });
 
 app.patch("/observations/:id/supersede", (req, res) => {
@@ -357,7 +404,8 @@ app.get("/briefs", (req, res) => {
   const limit = req.query.limit ? Number(req.query.limit) : 50;
   const offset = req.query.offset ? Number(req.query.offset) : 0;
   const briefs = listBriefs({ entity_id, brief_type, limit, offset });
-  return res.json({ briefs });
+  const total = countBriefs({ entity_id, brief_type });
+  return res.json(paginated(briefs, total, limit, offset));
 });
 
 // ── Conflicts ──────────────────────────────────────────────────────
@@ -386,7 +434,8 @@ app.get("/conflicts", (req, res) => {
   const limit = req.query.limit ? Number(req.query.limit) : 50;
   const offset = req.query.offset ? Number(req.query.offset) : 0;
   const conflicts = listConflicts({ entity_id, status, limit, offset });
-  return res.json({ conflicts });
+  const total = countConflicts({ entity_id, status });
+  return res.json(paginated(conflicts, total, limit, offset));
 });
 
 app.patch("/conflicts/:id/resolve", (req, res) => {
@@ -418,13 +467,35 @@ app.post("/import", (req, res) => {
   }
 });
 
+// ── Error handler ──────────────────────────────────────────────────
+
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error(JSON.stringify({ error: err.message, stack: err.stack, ts: new Date().toISOString() }));
+  res.status(500).json({ error: "Internal server error" });
+});
+
 // ── Start ──────────────────────────────────────────────────────────
+
+let server: ReturnType<typeof app.listen> | null = null;
 
 const isDirectRun = process.argv[1]?.includes("server");
 if (isDirectRun) {
-  app.listen(config.port, () => {
+  server = app.listen(config.port, () => {
     console.log(`OpenCRM REST API listening on ${config.port}`);
   });
+
+  for (const signal of ["SIGTERM", "SIGINT"] as const) {
+    process.on(signal, () => {
+      console.log(`Received ${signal}, shutting down...`);
+      server?.close(() => {
+        try {
+          getDb().close();
+        } catch { /* already closed */ }
+        console.log("Server stopped.");
+        process.exit(0);
+      });
+    });
+  }
 }
 
 export { app };
