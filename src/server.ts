@@ -420,8 +420,11 @@ app.post("/import", (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────
 
-app.listen(config.port, () => {
-  console.log(`OpenCRM REST API listening on ${config.port}`);
-});
+const isDirectRun = process.argv[1]?.includes("server");
+if (isDirectRun) {
+  app.listen(config.port, () => {
+    console.log(`OpenCRM REST API listening on ${config.port}`);
+  });
+}
 
 export { app };
