@@ -1,17 +1,37 @@
 # OpenCRM
 
-Open-source, self-hosted, agent-first CRM. Agents are the UI — OpenCRM is the system of record.
+**The CRM where agents are the UI.**
 
-Local-only by design. No cloud dependencies. SQLite-backed with REST API and MCP server interfaces.
+Open-source, local-first CRM built for AI agents. Fully configurable to your workflow.
+SQLite-backed. REST API + MCP server. Evidence-first memory.
 
-## Why OpenCRM
+<!-- badges -->
+[![Build](https://github.com/Attri-Inc/open-crm/actions/workflows/ci.yml/badge.svg)](https://github.com/Attri-Inc/open-crm/actions)
+[![Tests](https://img.shields.io/badge/tests-61%20passing-brightgreen)](https://github.com/Attri-Inc/open-crm)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-27%20tools-purple)](https://modelcontextprotocol.io)
 
-Traditional CRMs are built for humans clicking buttons. OpenCRM is built for AI agents that need:
+<!-- TODO: Add 30-second demo GIF here showing Claude Desktop using OpenCRM MCP tools -->
+<!-- Record with Rekort or asciinema: create contact → ingest email → extract observations → generate brief -->
 
-- **Deterministic retrieval** — structured filters, full-text search, graph traversal
-- **Evidence-first memory** — every claim traces back to raw artifacts
-- **Correction as a first-class concept** — observations can be superseded or retracted without losing history
-- **Provenance** — field-level source tracking for trust and auditability
+---
+
+## Why OpenCRM?
+
+Traditional CRMs are built for humans clicking buttons. AI agent frameworks are built for orchestration, not data persistence. OpenCRM fills the gap: a system of record designed from the ground up for agents.
+
+| | **OpenCRM** | **Twenty** | **Salesforce** | **SuiteCRM** |
+|---|---|---|---|---|
+| **Built for** | AI agents | Humans | Humans | Humans |
+| **Architecture** | Headless API + MCP | Full UI + GraphQL | Full UI + API | Full UI + API |
+| **Memory model** | Evidence chain (artifacts → observations → briefs → conflicts) | Standard fields | Standard fields | Standard fields |
+| **Provenance** | Field-level source tracking | None | None | None |
+| **Self-corrections** | First-class (supersede / retract) | Overwrite | Overwrite | Overwrite |
+| **MCP native** | 27 tools | No | No | No |
+| **Self-hosted** | SQLite, zero dependencies | Postgres required | Cloud only | LAMP stack |
+| **License** | Apache 2.0 | AGPL 3.0 | Proprietary | AGPL 3.0 |
+
+---
 
 ## Quick Start
 
@@ -23,10 +43,8 @@ npm run dev
 
 Server starts at `http://localhost:8787`.
 
-### Seed with sample data
-
 ```bash
-npm run seed
+npm run seed    # Populate with sample CRM data
 ```
 
 ### Run with Docker
@@ -36,6 +54,54 @@ docker compose up --build
 ```
 
 Data persists in a named volume (`crm-data`).
+
+---
+
+## Built for the Agent Era
+
+OpenCRM is designed around five pillars:
+
+### 1. Agent-First
+No human UI. The REST API (29 endpoints) and MCP server (27 tools) are the only interfaces. Agents don't need buttons — they need structured, typed, deterministic access to data.
+
+### 2. Evidence-First Memory
+Every claim traces back to raw evidence. The memory layer follows a structured chain: **Artifacts** (raw evidence like emails and transcripts) → **Observations** (typed claims with lifecycle management) → **Briefs** (derived summaries citing observations) → **Conflicts** (explicit disagreement records). No opaque summaries. No hallucination-friendly black boxes.
+
+### 3. Local-First
+SQLite-backed, zero cloud dependencies. Runs on your machine or self-hosts on your own infrastructure (GCP, AWS, etc.) at a fraction of per-seat SaaS costs. Your data stays yours.
+
+### 4. MCP-Native
+Designed for the Model Context Protocol ecosystem. 27 tools purpose-built for Claude Desktop, Claude Code, and any MCP-compatible client. Plug-and-play with the fastest-growing agent integration standard.
+
+### 5. Composable & Configurable
+Pure data layer — bring your own agents, LLMs, and workflows. Works with LangChain, CrewAI, AutoGen, or custom agents. Configure entity types, properties, and integrations for your specific domain. A masonry contractor tracks projects and bids; a SaaS company tracks accounts and ARR. Same core, different configuration.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+  A[Agent Client] -->|MCP tools| M[MCP Server]
+  A -->|REST| R[REST API]
+
+  M --> S[OpenCRM Core]
+  R --> S
+
+  S --> DB[(SQLite)]
+  DB --> E[Entities]
+  DB --> L[Relationships]
+  DB --> EV[Event Ledger]
+  DB --> FTS[FTS Index]
+  DB --> AR[Artifacts]
+  DB --> OB[Observations]
+  DB --> BR[Briefs]
+  DB --> CF[Conflicts]
+```
+
+Both interfaces share the same core. All writes produce immutable events in the ledger. All data is Zod-validated. All list endpoints return paginated responses.
+
+---
 
 ## MCP Server (Claude Desktop / Claude Code)
 
@@ -59,6 +125,26 @@ Add to your MCP client config:
 }
 ```
 
+### MCP Tools (27)
+
+**Entities:** `create_entity`, `update_entity`, `get_entity`, `search_entities`, `archive_entity`
+
+**Relationships:** `link_entities`, `unlink_entities`, `list_relationships`, `traverse_graph`
+
+**History:** `get_entity_history`
+
+**Artifacts:** `ingest_artifact`, `get_artifact`, `list_artifacts`
+
+**Observations:** `add_observation`, `get_observation`, `list_observations`, `supersede_observation`, `retract_observation`
+
+**Briefs:** `create_brief`, `get_brief`, `list_briefs`
+
+**Conflicts:** `create_conflict`, `get_conflict`, `list_conflicts`, `resolve_conflict`
+
+**Data:** `export_data`, `import_data`
+
+---
+
 ## Data Model
 
 ### Entities
@@ -78,9 +164,11 @@ Directed edges between entities: `EMPLOYED_AT`, `ASSOCIATED_WITH`, `OWNS`, `INTE
 
 ### Supporting
 
-- **Event Ledger** — append-only audit trail for every mutation
+- **Event Ledger** — append-only audit trail for every mutation, with actor context
 - **Field Provenance** — per-field source tracking
 - **FTS Index** — full-text search across entity properties
+
+---
 
 ## REST API
 
@@ -119,36 +207,20 @@ All list endpoints return paginated responses: `{ items, total, limit, offset, h
 
 Write endpoints support idempotency via `x-idempotency-key` header.
 
-## MCP Tools (27)
-
-**Entities:** `create_entity`, `update_entity`, `get_entity`, `search_entities`, `archive_entity`
-
-**Relationships:** `link_entities`, `unlink_entities`, `list_relationships`, `traverse_graph`
-
-**History:** `get_entity_history`
-
-**Artifacts:** `ingest_artifact`, `get_artifact`, `list_artifacts`
-
-**Observations:** `add_observation`, `get_observation`, `list_observations`, `supersede_observation`, `retract_observation`
-
-**Briefs:** `create_brief`, `get_brief`, `list_briefs`
-
-**Conflicts:** `create_conflict`, `get_conflict`, `list_conflicts`, `resolve_conflict`
-
-**Data:** `export_data`, `import_data`
+---
 
 ## Development
 
 ```bash
 npm run dev          # Start REST API with hot reload
 npm run mcp          # Start MCP server (stdio)
-npm test             # Run tests
+npm test             # Run tests (61 passing)
 npm run test:watch   # Run tests in watch mode
 npm run build        # TypeScript compile
 npm run seed         # Populate with sample data
 ```
 
-## Architecture
+## Project Structure
 
 ```
 src/
@@ -161,7 +233,7 @@ src/
   mcp.ts       — MCP stdio server
 ```
 
-Both the REST API and MCP server share the same `db.ts` core.
+---
 
 ## License
 

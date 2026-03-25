@@ -1,56 +1,64 @@
 # OpenCRM Vision + High-Level Architecture
 
 ## Vision
-OpenCRM is a local-first, headless CRM designed for AI agents as the primary users.
+OpenCRM is an open-source, local-first, headless CRM framework designed for AI agents as the primary users. It is fully agnostic — not tied to any specific LLM, agent framework, or frontend — so you can build on top of it and configure it to your exact workflow.
 
 OpenCRM is not a "chatbot CRM". It is a system-of-record and retrieval substrate that lets agents:
 1. Store canonical CRM objects (contacts, companies, deals, interactions, tasks).
-2. Preserve evidence and provenance for every important claim.
-3. Retrieve facts deterministically (filters, FTS, graph traversal) and optionally semantically (future vectors).
-4. Maintain compact, regeneratable briefings (contact/account/deal) that stay tied to evidence.
-
-## Design Principles
-1. Agents are the UI.
-2. Deterministic by default. Semantic is additive, never the only retrieval path.
-3. Evidence-first. Claims should be traceable to raw artifacts.
-4. Corrections are normal. The system must support superseding and retracting claims without losing history.
-5. Summaries are derived, not authoritative.
-6. Local-only v0. No required cloud dependencies.
-7. Vendor-neutral. OpenCRM should not require a specific LLM provider.
+2. Preserve evidence and provenance for every important claim, and retrieve facts deterministically (optional semantic search is on the roadmap).
+3. Take action — ingesting evidence from emails and documents, extracting structured data, connecting to external systems. Agents are not just a query layer; they are operators.
 
 ## Who This Is For
-1. Agent builders who need a reliable CRM substrate for many autonomous workflows.
+1. Agent builders who need a reliable, configurable CRM substrate for autonomous workflows.
 2. Teams that want local control of CRM data while giving agents safe, typed access.
+3. Organizations looking to replace expensive per-seat CRM platforms with a self-hosted, AI-native alternative configured to their specific domain.
+
+## Design Principles
+1. Agents are the UI. They don't just retrieve data; they ingest evidence, extract facts, and take action.
+2. Local-first. No required cloud dependencies, and for organizations that need shared access across teams, OpenCRM is self-hostable on your own infrastructure (GCP, AWS, etc.) at a fraction of per-seat SaaS costs.
+3. Vendor-neutral. OpenCRM should not require a specific LLM provider.
+
+## Configure It To Your Workflow
+
+OpenCRM is a universal foundation, not a finished product. You take the core package and configure it for your specific domain: define your entity types and properties, wire up your integrations, and deploy.
+
+E.g. a masonry contractor tracks projects, bids, and superintendents instead of contacts and deals. A SaaS company tracks accounts, ARR, and renewal dates. A recruiting firm tracks candidates, roles, and placements. The data model is the same — typed entities with JSON properties, relationships, and an evidence layer — but the configuration is entirely yours.
+
+## Intentionally Headless — Bring Your Own UI
+
+OpenCRM ships with no frontend. This is a deliberate architectural choice, not a missing feature.
+
+Traditional CRMs couple their data layer to a rigid, opinionated UI. When that UI doesn't fit your workflow, you're stuck customizing within the vendor's constraints. OpenCRM inverts this: the data layer and agent tooling are the product. The interface is whatever you want it to be.
+
+With OpenCRM the interface is easily malleable through conversation. Ask the agent to redesign a list view as a kanban board, add a new report, or surface a different metric — the app adapts to your organization's changing needs without developer intervention.
+
+### Why Decoupled UI Matters
+1. **Every team's workflow is different.** A sales team tracking enterprise deals needs a different interface than a founder managing inbound leads. Forcing one UI on both means neither is well-served.
+2. **AI can generate UIs now.** Tools like Claude, ChatGPT, Cursor, Bolt, Lovable, and v0 can scaffold a full frontend from a natural language description in minutes. The bottleneck is no longer building the UI — it's having a solid, well-documented API behind it.
+3. **Agents don't need UIs.** For pure agent workflows (the primary use case), the REST API and MCP tools are the interface. A human-facing UI is only needed for oversight and manual overrides.
+
+### How to Build Your Own Frontend
+OpenCRM exposes everything through two clean interfaces — use whichever fits your stack:
+
+1. **REST API (29 endpoints)** — Standard HTTP/JSON. Connect any frontend framework: React, Next.js, Vue, Svelte, a mobile app, or even a spreadsheet via API calls. All endpoints are documented with consistent pagination, filtering, and error handling.
+
+2. **MCP Server (27 tools)** — For conversational interfaces. Connect to Claude Desktop, Claude Code, or any MCP-compatible client. The agent becomes the UI — users interact with their CRM data through natural language.
+
+### Getting Started with a Custom UI
+The fastest path to a working frontend:
+
+1. **Vibe-code it.** Describe what you want to an AI coding tool (Claude, ChatGPT, Cursor, etc.): *"Build me a React dashboard that shows my deals pipeline using the OpenCRM REST API at localhost:8787. Include a kanban board for deal stages, a contacts list with search, and a timeline of recent interactions."* The API is conventional enough that any code-generation tool can work with it.
+
+2. **Start from the seed data.** Run `npm run seed` to populate with sample data, then point your UI at the API. You'll have realistic entities, relationships, and memory layer data to build against immediately.
+
+3. **Use the MCP tools for a conversational UI.** If you'd rather interact through chat than clicks, connect OpenCRM's MCP server to Claude Desktop. You get a full CRM interface through natural language — no frontend code needed.
 
 ## Non-Goals (Initial OSS Release)
 1. Hosted sync or multi-tenant SaaS.
 2. Email/calendar ingestion and enrichment connectors (provide extension points instead).
-3. End-user UI.
+3. Bundled end-user UI (see "Intentionally Headless" above — build your own or use the MCP conversational interface).
 4. "Vector-only" memory or opaque summaries that cannot be audited.
-
----
-
-## Bare Minimum To Drive Value (OSS Release v0.1)
-
-### Must-Have Capabilities
-1. Local runtime with SQLite.
-2. REST API for automation.
-3. MCP server for agent tool access (Claude and other MCP clients).
-4. Canonical entities and relationships.
-5. Deterministic retrieval: structured filters, FTS, and relationship traversal.
-6. Event ledger for every mutation.
-7. Provenance metadata so agents can answer "why do we believe this?".
-8. Import/export.
-
-### Minimum "Memory" That Actually Matters For CRM
-To deliver real CRM value, OpenCRM needs more than generic notes.
-
-1. Artifacts (raw evidence).
-2. Observations (typed claims extracted from artifacts).
-3. Briefs (derived summaries that cite observations).
-4. Conflicts (explicit records when observations disagree) that create verification tasks.
-
-OpenCRM should support these primitives even if the extraction is performed by an external agent.
+5. Existing CRM integrations (Salesforce, Zoho, HubSpot) — on the roadmap for organizations that want OpenCRM's AI-native configurability layered on top of their current platform.
 
 ---
 
@@ -73,130 +81,35 @@ flowchart LR
   DB --> OB[Observations]
   DB --> BR[Briefs]
   DB --> CF[Conflicts]
-
-  subgraph "Optional (Future)"
-    V[(Vector Index)]
-  end
-
-  S -.-> V
 ```
 
-### Runtime Model (Local)
-1. REST server runs on localhost for programmatic access.
-2. MCP server runs over stdio for Claude Desktop and other MCP clients.
-3. Both call the same OpenCRM core (database + policies).
+Both the REST API and MCP server call the same core. The data model is typed entities with JSON properties, directed relationships, an append-only event ledger, field-level provenance, and a memory layer (artifacts → observations → briefs → conflicts).
 
 ---
 
-## Core Data Model (Conceptual)
+## Evidence-First Memory
 
-### Entities (System of Record)
-1. `Contact`, `Company`, `Deal`, `Interaction`, `Task`, `Agent`.
-2. Stored as typed entities with JSON properties.
-3. Relationships are first-class edges.
+OpenCRM's memory layer is not generic notes. It is a structured evidence chain designed for CRM:
 
-### Event Ledger (Audit)
-1. Every create/update/archive produces an immutable event.
-2. Events record actor context (agent id, tool call id, prompt hash).
+1. **Artifacts** — Raw, immutable evidence (emails, transcripts, meeting notes, documents). Content-hashed for integrity.
+2. **Observations** — Typed claims extracted from artifacts, with lifecycle management (`current` → `superseded` / `retracted`). Every claim links back to its source.
+3. **Briefs** — Derived summaries that cite observations. Always regeneratable — never authoritative.
+4. **Conflicts** — Explicit records when observations disagree. Never silently resolved.
 
-### Provenance (Trust)
-1. Entity-level provenance (default source context).
-2. Field-level provenance overrides for specific fields.
+The progressive retrieval pattern — brief → observations → artifacts — lets agents start with a summary and drill down to raw evidence when needed. This is how you build trust: every claim has receipts.
 
 ---
 
-## CRM-Specific Memory Redesign (Beyond Generic "Memory")
+## Memory Policy
 
-### 1) Artifacts
-Raw, immutable sources of truth.
-
-Examples:
-1. Email thread.
-2. Call transcript.
-3. Meeting notes.
-4. Document attachment.
-
-Properties:
-1. `artifact_id`, `artifact_type`, `timestamp`, `participants`, `hash`.
-2. `content` or pointer to content.
-
-### 2) Observations
-Atomic, typed claims extracted from artifacts.
-
-Examples:
-1. Deal budget is 120000 USD.
-2. Decision maker is Maya Chen.
-3. Security review required.
-4. Next step is "send pricing".
-
-Key requirements:
-1. Evidence link: each observation references `artifact_id` plus a stable snippet pointer.
-2. Lifecycle: `current`, `superseded`, `retracted`.
-3. Time: `as_of` and optional `valid_until`.
-4. Confidence and verification.
-
-### 3) Briefs
-Derived summaries that are always regeneratable from observations.
-
-Rules:
-1. Brief lines should cite observation ids.
-2. Briefs are not authoritative.
-3. Briefs must be re-buildable to prevent drift.
-
-### 4) Conflicts
-Explicit records when two observations cannot both be true.
-
-Rules:
-1. Never silently choose a winner.
-2. Create a conflict and a verification task.
+Observation extraction and brief generation are governed by structured, versioned policies (per workspace or per entity type). Policies define which facets to extract, confidence thresholds, conflict behavior, and brief templates. Every derived output is tagged with the policy version that produced it.
 
 ---
 
-## User Control (Policy) For Observations and Briefs
-Yes, there should be user control, but it should be structured and versioned.
-
-### Memory Policy (Per Workspace, Optional Per Entity Type)
-A policy defines:
-1. Which facets to extract.
-2. What requires evidence.
-3. Confidence thresholds for marking observations as `current`.
-4. Conflict behavior.
-5. Brief template sections and constraints.
-6. Rebuild cadence rules.
-
-Important: OpenCRM stores policy versions and tags every derived output with the policy version used.
-
----
-
-## Retrieval Strategy (At Scale)
+## Retrieval Strategy
 1. Structured filters for exact constraints.
-2. FTS for fast keyword search across key text fields.
+2. FTS for keyword search across entity properties.
 3. Graph traversal for relationship-heavy queries.
-4. Optional vector search for semantic discovery (future module).
-5. Progressive retrieval pattern: brief -> observations -> artifacts.
-
----
-
-## Minimal MCP Tool Surface (v0.1)
-OpenCRM should expose simple, composable tools that map to the primitives.
-
-1. Entity tools: create/get/update/archive/search.
-2. Relationship tools: link/unlink/traverse.
-3. History tools: event ledger query.
-4. Memory tools: ingest_artifact, add_observation, list_observations, get_brief, get_evidence.
-
----
-
-## What We Should Build Next (Concrete Steps)
-1. Add first-class tables and APIs for `artifacts`, `observations`, `briefs`, and `conflicts`.
-2. Implement conflict detection and stale-fact checks that create `tasks`.
-3. Implement policy storage and versioning.
-4. Add MCP tools for the memory primitives.
-5. Add import/export for all primitives.
-6. Add a small "recipes" section in README with human prompts for Claude to ingest artifacts and generate briefs.
-
----
-
-## Notes On Licensing
-This repo currently uses a Sustainable Use style license (source-available). This is not OSI open source.
+4. Progressive retrieval: brief → observations → artifacts.
+5. Optional vector search for semantic discovery (future).
 
