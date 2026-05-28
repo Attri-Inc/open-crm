@@ -1,0 +1,17 @@
+name: Attri Dev Kit
+
+on:
+  push:
+    branches: [main, master, dev, dev-*, develop, qa, uat, staging]
+  pull_request:
+    branches: [main, master, dev, dev-*, develop, qa, uat, staging, release/*]
+
+jobs:
+  attri-dev-kit:
+    uses: Attri-Inc/attri-dev-kit/.github/workflows/gate.yml@v1
+    with:
+      tier: auto
+      languages: typescript
+      fail-on: high
+      pr-size-hard-limit: 5000
+    secrets: inherit
