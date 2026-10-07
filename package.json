@@ -2,6 +2,16 @@
   "name": "opencrm",
   "version": "1.0.0",
   "private": true,
+  "description": "Open-source CRM memory for AI agents: every fact links to the email or transcript behind it, and conflicts stay flagged, not overwritten.",
+  "license": "Apache-2.0",
+  "homepage": "https://open-crm.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attri-Inc/open-crm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Attri-Inc/open-crm/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "tsx src/server.ts",

@@ -6,7 +6,7 @@ OpenCRM is designed as a local-only, self-hosted application. It does not includ
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please report it privately via GitHub's security advisory feature rather than opening a public issue.
+If you discover a security vulnerability, please report it privately via GitHub's security advisory feature or by email to **engineering@attri.ai**, rather than opening a public issue.
 
 ## Supported Versions
 
